@@ -1,0 +1,16 @@
+{
+  "name": "@daitanreact/components",
+  "version": "1.0.0",
+  "main": "index.jsx",
+  "module": "index.jsx",
+  "types": "index.d.ts",
+  "type": "module",
+  "license": "MIT",
+  "peerDependencies": {
+      "react": "^18.0.0",
+      "react-dom": "^18.0.0"
+  },
+  "dependencies": {
+      "prop-types": "^15.8.0"
+  }
+}
