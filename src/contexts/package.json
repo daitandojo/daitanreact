@@ -1,0 +1,12 @@
+{
+  "name": "@daitanreact/contexts",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "type": "module",
+  "peerDependencies": {
+      "react": "^18.0.0"
+  },
+  "license": "MIT"
+}

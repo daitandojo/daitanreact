@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
   "devDependencies": {
     "eslint": "^8.57.1",
     "eslint-config-airbnb": "^19.0.4",
@@ -22,5 +19,6 @@
   },
   "dependencies": {
     "prop-types": "^15.8.1"
-  }
+  },
+  "workspaces": ["src/*"]
 }
