@@ -1,0 +1,102 @@
+const languageData = {
+  "SelectModel": {
+    "en": "Select payment model",
+    "es": "Elegir modelo de pago",
+    "nl": "Kies een betaalmodel",
+    "de": "Modell auswählen",
+    "it": "Seleziona il modello",
+    "pt": "Selecione o modelo",
+    "fr": "Sélectionnez le modèle",
+    "da": "Vælg model",
+    "tr": "Model seçin",
+    "no": "Velg modell",
+    "se": "Välj modell",
+    "id": "Pilih model"
+  },
+  "ClientByClient": {
+    "en": "Client By Client",
+    "es": "Cliente Por Cliente",
+    "nl": "Klant voor Klant",
+    "de": "Kunde für Kunde",
+    "it": "Cliente per cliente",
+    "pt": "Cliente a Cliente ",
+    "fr": "Client par client",
+    "da": "Client By Client",
+    "tr": "Müşteriye Göre Müşteri",
+    "no": "klient etter klient",
+    "se": "Client By Client",
+    "id": "Klien Demi Klien"
+  },
+  "SpeedyGrowth": {
+    "en": "Speedy Business Growth",
+    "es": "Crecimiento veloz",
+    "nl": "Snelle Groei",
+    "de": "Schnelles Geschäftswachstum",
+    "it": "Crescita rapida del business",
+    "pt": "Crescimento acelerado dos negócios",
+    "fr": "Croissance rapide de l'entreprise",
+    "da": "Hurtig virksomhedsvækst",
+    "tr": "İşletmenizin Hızlı Büyümesi",
+    "no": "Rask virksomhetsvekst",
+    "se": "Snabb affärstillväxt",
+    "id": "Pertumbuhan Bisnis yang Cepat"
+  },
+  "ThankYouForPurchasing": {
+    "en": "Thank you for purchasing a pack of {{quantity}} tokens. The amount is {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} per token). We use a secure server and the Stripe platform for your payment and your details will not be stored. Please proceed by providing your card details.",
+    "es": "Gracias por comprar un paquete de {{quantity}} tokens. El monto es de {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} por token). Utilizamos un servidor seguro y la plataforma Stripe para su pago y sus datos no serán almacenados. Por favor, continúe proporcionando los detalles de su tarjeta.",
+    "nl": "Bedankt voor het kopen van een pakket van {{quantity}} tokens. Het bedrag is {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} per token). We gebruiken een beveiligde server en het Stripe-platform voor uw betaling en uw gegevens worden niet opgeslagen. Ga verder door uw kaartgegevens te verstrekken.",
+    "de": "Vielen Dank für den Kauf eines Pakets mit {{quantity}} Tokens. Der Betrag beträgt {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} pro Token). Wir verwenden einen sicheren Server und die Stripe-Plattform für Ihre Zahlung und Ihre Daten werden nicht gespeichert. Bitte fahren Sie fort, indem Sie Ihre Kartendaten angeben.",
+    "it": "Grazie per aver acquistato un pacchetto di {{quantity}} token. L'importo è di {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} per token). Utilizziamo un server sicuro e la piattaforma Stripe per il tuo pagamento e i tuoi dettagli non saranno memorizzati. Si prega di procedere fornendo i dettagli della propria carta.",
+    "pt": "Obrigado por comprar um pacote de {{quantity}} tokens. O valor é {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} por token). Usamos um servidor seguro e a plataforma Stripe para o seu pagamento e seus detalhes não serão armazenados. Por favor, prossiga fornecendo os detalhes do seu cartão.",
+    "fr": "Merci d'avoir acheté un pack de {{quantity}} jetons. Le montant est de {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} par jeton). Nous utilisons un serveur sécurisé et la plateforme Stripe pour votre paiement et vos détails ne seront pas stockés. Veuillez procéder en fournissant les détails de votre carte.",
+    "da": "Tak fordi du købte en pakke med {{quantity}} tokens. Beløbet er {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} pr. token). Vi bruger en sikker server og Stripe-platformen til din betaling, og dine oplysninger vil ikke blive gemt. Venligst fortsæt med at give dine kortoplysninger.",
+    "tr": "Bir paket {{quantity}} token satın aldığınız için teşekkür ederiz. Tutar {{totalPrice}} {{currency}} (token başına {{pricePerToken}} {{currency}}). Ödemeniz için güvenli bir sunucu ve Stripe platformunu kullanıyoruz ve detaylarınız saklanmayacak. Lütfen kart detaylarınızı sağlayarak devam edin.",
+    "no": "Takk for at du kjøpte en pakke med {{quantity}} tokens. Beløpet er {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} per token). Vi bruker en sikker server og Stripe-plattformen for betalingen din, og detaljene dine vil ikke bli lagret. Vennligst fortsett ved å oppgi kortdetaljene dine.",
+    "se": "Tack för att du köpt ett paket med {{quantity}} tokens. Beloppet är {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} per token). Vi använder en säker server och Stripe-plattformen för din betalning och dina uppgifter kommer inte att lagras. Vänligen fortsätt genom att ange dina kortuppgifter.",
+    "id": "Terima kasih telah membeli paket {{quantity}} token. Jumlahnya adalah {{totalPrice}} {{currency}} ({{pricePerToken}} {{currency}} per token). Kami menggunakan server yang aman dan platform Stripe untuk pembayaran Anda dan detail Anda tidak akan disimpan. Silakan lanjutkan dengan menyediakan detail kartu Anda."
+  },
+  "ThankYou": {
+    "en": "Thank you",
+    "es": "Gracias",
+    "nl": "Dank je",
+    "de": "Danke schön",
+    "it": "Grazie",
+    "pt": "Obrigada",
+    "fr": "Merci",
+    "da": "tak skal du have",
+    "tr": "Teşekkürler",
+    "no": "Takk skal du ha",
+    "se": "Tack",
+    "id": "Terima kasih"
+  },
+  "YourTokens": {
+    "en": "Your tokens",
+    "es": "Tus tokens",
+    "nl": "Je tokens",
+    "de": "Deine Tokens",
+    "it": "I tuoi token",
+    "pt": "Seus tokens",
+    "fr": "Vos jetons",
+    "da": "Dine jetoner",
+    "tr": "Jetonlarınız",
+    "no": "Dine tokens",
+    "se": "Dina token",
+    "id": "Token Anda"
+  },
+  "AddTokens": {
+    "en": "Add tokens",
+    "es": "Añadir tokens",
+    "nl": "Tokens toevoegen",
+    "de": "Token hinzufügen",
+    "it": "Aggiungi token",
+    "pt": "Adicionar tokens",
+    "fr": "Ajouter des jetons",
+    "da": "Tilføj tokens",
+    "tr": "Jeton ekle",
+    "no": "Legg til tokens",
+    "se": "Lägg till tokens",
+    "id": "Tambahkan token"
+  }
+};
+
+export default languageData;

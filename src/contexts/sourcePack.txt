@@ -1,0 +1,61 @@
+# File: src/contexts/package.json
+{
+  "name": "@daitanreact/contexts",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "type": "module",
+  "peerDependencies": {
+      "react": "^18.3.1"
+  },
+  "license": "MIT"
+}
+
+
+# File: src/contexts/src/ThemeContext/index.js
+import React, { createContext, useContext, useState } from 'react';
+
+const ThemeContext = createContext();
+
+export const ThemeProvider = ({ children }) => {
+    const [theme, setTheme] = useState('light');
+
+    const toggleTheme = () => {
+        setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
+    };
+
+    return (
+        <ThemeContext.Provider value={{ theme, toggleTheme }}>
+            {children}
+        </ThemeContext.Provider>
+    );
+};
+
+export const useTheme = () => {
+    const context = useContext(ThemeContext);
+    if (!context) {
+        throw new Error('useTheme must be used within a ThemeProvider');
+    }
+    return context;
+};
+  
+
+# File: src/contexts/src/ThemeContext/styles.js
+const lightTheme = {
+  background: '#ffffff',
+  color: '#000000',
+};
+
+const darkTheme = {
+  background: '#000000',
+  color: '#ffffff',
+};
+
+export const themes = { light: lightTheme, dark: darkTheme };
+
+
+# File: src/contexts/src/index.js
+export { ThemeProvider, useTheme } from './ThemeContext';
+
+

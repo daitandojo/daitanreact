@@ -1,0 +1,601 @@
+# File: src/api/aigenerate/index.js
+// src/app/api/aigenerate/route.js
+
+import dotenv from "dotenv";
+dotenv.config();
+
+import { generateIntelligence } from "@daitanjs/intelligence";
+
+export async function POST(request) {
+  try {
+    console.log("POST request received at /api/aigenerate");
+
+    const { messages } = await request.json();
+
+    if (!Array.isArray(messages)) {
+      throw new Error('"messages" must be an array of messages.');
+    }
+
+    const responseObject = await generateIntelligence({ messages });
+
+    console.log("AI response:", JSON.stringify(responseObject, null, 2));
+
+    if (!responseObject || typeof responseObject !== "object") {
+      throw new Error("AI response is invalid or empty.");
+    }
+
+    if (!responseObject.type || !responseObject.question) {
+      throw new Error("AI response is missing required fields.");
+    }
+
+    if (!Array.isArray(responseObject.answers)) {
+      responseObject.answers = [];
+    }
+
+    return new Response(JSON.stringify(responseObject), {
+      headers: { "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error during AI generation:", error.message);
+    console.error("Stack trace:", error.stack);
+
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+}
+
+
+# File: src/api/allusers/index.js
+import { connect, User } from '@daitanjs/data';
+
+export async function GET() {
+  try {
+    // Connect to MongoDB
+    console.log('[GET /api/test] Connecting to MongoDB...');
+    await connect();
+    console.log('[GET /api/test] Successfully connected to MongoDB.');
+
+    // Fetch all users
+    const users = await User.find({})
+    console.log('[GET /api/test] Users fetched:', users);
+
+    // Return the list of users as JSON
+    return new Response(JSON.stringify(users), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error(`[GET /api/test] Error fetching users: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to fetch users' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+
+# File: src/api/auth/googleCallback/index.js
+import { google } from 'googleapis';
+
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+const oauth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+
+export async function GET(req) {
+  try {
+    console.log('[googleCallback.js] GET: Received request');
+
+    const code = new URL(req.url).searchParams.get('code');
+    if (!code) {
+      console.error('[googleCallback.js] GET: Authorization code missing');
+      return new Response(JSON.stringify({ error: 'Authorization code missing' }), { status: 400 });
+    }
+
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+
+    console.log('[googleCallback.js] GET: Successfully retrieved user info');
+    return new Response(JSON.stringify({ user: userInfo.data }), { status: 200 });
+  } catch (error) {
+    console.error(`[googleCallback.js] GET: Error - ${error.message}`, error);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  }
+}
+
+
+# File: src/api/auth/googleLogin/index.js
+import { auth } from '../../../lib/firebaseClient';
+
+const HTTP_STATUS = {
+  OK: 200,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  INTERNAL_SERVER_ERROR: 500,
+};
+
+export async function POST(req) {
+  console.info('[googleLogin.js] POST: Received request');
+
+  try {
+    const rawBody = await req.text();
+
+    if (!rawBody || typeof rawBody !== 'string') {
+      console.error('[googleLogin.js] POST: Empty or invalid request body');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Request body is empty or invalid' }),
+        { status: HTTP_STATUS.BAD_REQUEST, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let parsedBody;
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch (error) {
+      console.error('[googleLogin.js] POST: Invalid JSON format', error.message);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON format in request body' }),
+        { status: HTTP_STATUS.BAD_REQUEST, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { idToken } = parsedBody;
+
+    if (!idToken || typeof idToken !== 'string' || idToken.trim().length < 20) {
+      console.error('[googleLogin.js] POST: Missing or invalid ID token');
+      return new Response(
+        JSON.stringify({ success: false, error: 'ID token is missing or invalid' }),
+        { status: HTTP_STATUS.BAD_REQUEST, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.info('[googleLogin.js] POST: Verifying ID token');
+
+    try {
+      const decodedToken = await auth.verifyIdToken(idToken);
+      console.info('[googleLogin.js] POST: Token verified successfully');
+
+      return new Response(
+        JSON.stringify({ success: true, user: decodedToken }),
+        { status: HTTP_STATUS.OK, headers: { 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      console.error('[googleLogin.js] POST: Token verification failed', error.message);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or expired ID token' }),
+        { status: HTTP_STATUS.UNAUTHORIZED, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch (error) {
+    console.error('[googleLogin.js] POST: Unexpected Error', error.message, error);
+    return new Response(
+      JSON.stringify({ success: false, error: 'An unexpected error occurred' }),
+      { status: HTTP_STATUS.INTERNAL_SERVER_ERROR, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+
+# File: src/api/auth/login/index.js
+import { initializeFirebase, signIn } from '../../../lib/firebaseClient';
+
+export async function POST(req, res) {
+  console.info('[login.js] POST: Received request');
+
+  if (req.method !== 'POST') {
+    console.error('[login.js] POST: Method not allowed');
+    return res
+      .status(405)
+      .json({ success: false, error: 'Method not allowed' });
+  }
+
+  try {
+    const { email, password } = await req.json();
+
+    if (!email || !password) {
+      console.error('[login.js] POST: Missing email or password');
+      return res
+        .status(400)
+        .json({ success: false, error: 'Email and password are required' });
+    }
+
+    console.info('[login.js] POST: Authenticating user with Firebase');
+
+    // Initialize Firebase client
+    const { auth } = initializeFirebase();
+
+    // Authenticate using client-side Firebase Auth
+    const userCredential = await signIn(email, password);
+
+    // Retrieve ID token for the user
+    const token = await userCredential.getIdToken();
+
+    console.info('[login.js] POST: User authenticated successfully');
+    return res.status(200).json({
+      success: true,
+      token,
+      user: {
+        uid: userCredential.uid,
+        email: userCredential.email,
+      },
+    });
+  } catch (error) {
+    console.error(`[login.js] POST: Error during login - ${error.message}`);
+    return res
+      .status(500)
+      .json({ success: false, error: 'Authentication failed' });
+  }
+}
+
+
+# File: src/api/auth/logout/index.js
+import {
+  initializeFirebase,
+  signOut,
+} from '../../../lib/firebaseClient';
+
+export async function POST(req) {
+  console.info('[logout.js] POST: Received logout request');
+
+  try {
+    // Initialize Firebase client
+    const { auth } = initializeFirebase();
+
+    console.info('[logout.js] POST: Signing out the user');
+    await signOut(auth);
+
+    // Success response
+    return new Response(
+      JSON.stringify({ message: 'Successfully logged out' }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
+  } catch (error) {
+    console.error(
+      `[logout.js] POST: Unexpected error - ${error.message}`,
+      error,
+    );
+    return new Response(
+      JSON.stringify({ error: 'An unexpected error occurred' }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
+  }
+}
+
+
+# File: src/api/auth/user/index.js
+import { auth } from '@daitanjs/authentication';
+
+export async function GET(req) {
+  console.log('[user.js] GET: Received request to fetch user');
+
+  try {
+    // Extract Authorization Header
+    const authorizationHeader = req.headers.get('authorization');
+    if (!authorizationHeader || typeof authorizationHeader !== 'string') {
+      console.error('[user.js] GET: Missing or invalid authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Authorization header is missing or invalid' }),
+        { status: 401 }
+      );
+    }
+
+    console.log(
+      '[user.js] GET: Authorization header received:',
+      authorizationHeader
+    );
+
+    // Extract Bearer Token
+    const token = authorizationHeader.split('Bearer ')[1];
+    if (!token || typeof token !== 'string') {
+      console.error('[user.js] GET: Bearer token is missing or invalid');
+      return new Response(
+        JSON.stringify({ error: 'Bearer token is missing or invalid' }),
+        { status: 401 }
+      );
+    }
+
+    console.log('[user.js] GET: Verifying token:', token);
+
+    // Verify the token using Firebase Admin SDK
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(token);
+    } catch (verifyError) {
+      console.error(
+        '[user.js] GET: Token verification failed',
+        verifyError.message
+      );
+
+      const errorMessage =
+        verifyError.code === 'auth/argument-error'
+          ? 'Invalid or malformed token'
+          : 'Token verification failed';
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 401,
+      });
+    }
+
+    console.log('[user.js] GET: Token verified successfully:', decodedToken);
+
+    // Return the decoded user information
+    return new Response(JSON.stringify({ user: decodedToken }), {
+      status: 200,
+    });
+  } catch (error) {
+    console.error(
+      `[user.js] GET: Unexpected error - ${error.message}`,
+      error
+    );
+
+    // Detailed error response for debugging
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+    });
+  }
+}
+
+
+# File: src/api/geo/index.js
+import { forwardGeo, reverseGeo } from '@daitanjs/geo';
+
+export async function POST(req) {
+  try {
+    const { query, type } = await req.json();
+
+    if (type === 'forward') {
+      const locations = await forwardGeo({ location: query });
+      return new Response(JSON.stringify({ locations }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } else if (type === 'reverse') {
+      const address = await reverseGeo({ coordinates: query });
+      return new Response(JSON.stringify({ address }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Invalid request type' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+
+# File: src/api/mongodb/index.js
+import { connect } from '@daitanjs/data';
+
+export default async function handler(req, res) {
+  if (req.method === 'GET') {
+    try {
+      console.log('[GET /api/your-endpoint] Connecting to MongoDB...');
+      const { db } = await connect();
+      console.log('[GET /api/your-endpoint] Successfully connected to MongoDB.');
+      
+      console.log('[GET /api/your-endpoint] Fetching all users from the database...');
+      const data = await db.collection('users').find({}).toArray();
+      console.log(`[GET /api/your-endpoint] Successfully fetched ${data.length} users.`);
+      
+      res.status(200).json(data);
+    } catch (error) {
+      console.error(`[GET /api/your-endpoint] Error loading data: ${error.message}`);
+      res.status(500).json({ error: 'Failed to load data' });
+    }
+  } else {
+    console.warn(`[${req.method} /api/your-endpoint] Method not allowed.`);
+    res.status(405).json({ message: 'Only GET requests are allowed' });
+  }
+}
+
+
+# File: src/api/package.json
+{
+    "name": "@daitanreact/api",
+    "version": "1.0.0",
+    "main": "src/index.js",
+    "type": "module",
+    "exports": {
+        ".": {
+            "import": "./src/index.js"
+        }
+    },
+    "peerDependencies": {
+        "next": "^13.0.0"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "firebase": "^11.1.0",
+        "firebase-admin": "^13.0.2"
+    }
+}
+
+
+# File: src/api/users/[uid]/index.js
+import { connect } from '@daitanjs/data';
+import { 
+  getUserByUidController, 
+  updateUserController, 
+  deleteUserController 
+} from '../../../controllers/userController.js';
+
+export async function GET(req, { params }) {
+  const { uid } = params;
+
+  if (!uid) {
+    console.error('[GET /api/users] No user UID provided');
+    return new Response(JSON.stringify({ error: 'No UID provided' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+
+  try {
+    await connect();
+    const user = await getUserByUidController(uid);
+
+    if (!user) {
+      console.warn(`[GET /api/users/${uid}] User not found`);
+      return new Response(JSON.stringify({ error: 'User not found' }), { 
+        status: 404, 
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`[GET /api/users/${uid}] User found:`, user);
+    return new Response(JSON.stringify(user), { 
+      status: 200, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  } catch (error) {
+    console.error(`[GET /api/users/${uid}] Error fetching user: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to fetch user' }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+}
+
+export async function PUT(req, { params }) {
+  const { uid } = params;
+
+  if (!uid) {
+    console.error('[PUT /api/users] No UID provided');
+    return new Response(JSON.stringify({ error: 'No UID provided' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+
+  try {
+    await connect();
+    const body = await req.json();
+    const updatedUser = await updateUserController(uid, body);
+
+    if (!updatedUser) {
+      console.warn(`[PUT /api/users/${uid}] User not found`);
+      return new Response(JSON.stringify({ error: 'User not found' }), { 
+        status: 404, 
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`[PUT /api/users/${uid}] User updated successfully.`);
+    return new Response(JSON.stringify(updatedUser), { 
+      status: 200, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  } catch (error) {
+    console.error(`[PUT /api/users/${uid}] Error updating user: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to update user' }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+}
+
+export async function DELETE(req, { params }) {
+  const { uid } = params;
+
+  if (!uid) {
+    console.error('[DELETE /api/users] No UID provided');
+    return new Response(JSON.stringify({ error: 'No UID provided' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+
+  try {
+    console.log(`[DELETE /api/users/${uid}] Connecting to MongoDB...`);
+    await connect();
+    console.log(`[DELETE /api/users/${uid}] Successfully connected to MongoDB.`);
+    
+    console.log(`[DELETE /api/users/${uid}] Deleting user with Firebase UID: ${uid}`);
+    const deleteResult = await deleteUserController(uid);
+
+    if (deleteResult.error) {
+      console.warn(`[DELETE /api/users/${uid}] User not found`);
+      return new Response(JSON.stringify(deleteResult), { 
+        status: 404, 
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`[DELETE /api/users/${uid}] User deleted successfully.`);
+    return new Response(JSON.stringify({ message: 'User deleted' }), { 
+      status: 200, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  } catch (error) {
+    console.error(`[DELETE /api/users/${uid}] Error deleting user: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to delete user' }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+}
+
+
+# File: src/api/users/index.js
+import { connect } from '@daitanjs/data';
+import { getUsersController, createUserController } from '../../controllers/userController';
+
+export async function GET() {
+  try {
+    console.log('[GET /api/users] Connecting to database...');
+    await connect();
+    console.log('[GET /api/users] Database connected successfully.');
+
+    const users = await getUsersController();  // Updated to use "Controller" function
+    console.log(`[GET /api/users] ${users.length} users fetched successfully.`);
+
+    return new Response(JSON.stringify(users), { status: 200 });
+  } catch (error) {
+    console.error(`[GET /api/users] Error fetching users: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to fetch users' }), { status: 500 });
+  }
+}
+
+export async function POST(req) {
+  try {
+    console.log('[POST /api/users] Connecting to database...');
+    await connect();
+    console.log('[POST /api/users] Database connected successfully.');
+
+    const body = await req.json();
+    console.log('[POST /api/users] Request body received:', body);
+
+    if (!body.uid || !body.email || !body.displayName) {
+      console.error('[POST /api/users] Missing required fields:', body);
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
+    }
+
+    const newUser = await createUserController(body);  // Updated to use "Controller" function
+    console.log('[POST /api/users] User created successfully:', newUser);
+    
+    return new Response(JSON.stringify(newUser), { status: 201 });
+  } catch (error) {
+    console.error(`[POST /api/users] Error creating user: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to create user' }), { status: 500 });
+  }
+}
+
+

@@ -1,0 +1,35 @@
+# File: src/hooks/package.json
+{
+  "name": "@daitanreact/hooks",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "type": "module",
+  "peerDependencies": {
+      "react": "^18.3.1"
+  },
+  "license": "MIT"
+}
+
+
+# File: src/hooks/src/index.js
+export { default as useToggle } from './useToggle';
+
+
+# File: src/hooks/src/useToggle/index.js
+import { useState } from 'react';
+
+const useToggle = (initialValue = false) => {
+    const [value, setValue] = useState(initialValue);
+
+    const toggle = () => {
+        setValue((prevValue) => !prevValue);
+    };
+
+    return [value, toggle];
+};
+
+export default useToggle;
+
+

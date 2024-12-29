@@ -1,0 +1,22 @@
+{
+    "name": "@daitanreact/api",
+    "version": "1.0.0",
+    "main": "src/index.js",
+    "type": "module",
+    "exports": {
+        ".": {
+            "import": "./src/index.js"
+        }
+    },
+    "peerDependencies": {
+        "next": "^13.0.0"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "@daitanjs/authentication": "file:../../../daitanjs/src/authentication",
+        "@daitanjs/data": "file:../../../daitanjs/src/data",
+        "@daitanjs/geo": "file:../../../daitanjs/src/geo",
+        "@daitanjs/intelligence": "file:../../../daitanjs/src/intelligence",
+        "firebase": "^11.1.0"
+    }
+}

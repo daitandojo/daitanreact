@@ -3,7 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "clean": "rm -rf dist && npm run clean -w",
+    "test": "npm run test -w",
+    "rebuild-all": "npm run clean && npm install && npm run build",
+    "build-watch": "npm run build && chokidar 'src/**/*' --ignore 'src/**/dist/**' --ignore 'src/node_modules/**' --ignore 'src/package.json' --debounce 5000 -c 'npm run build'"
+  },
   "devDependencies": {
+    "chokidar-cli": "^3.0.0",
     "eslint": "^8.57.1",
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-prettier": "^9.1.0",
@@ -13,12 +21,20 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "prettier": "^2.8.8"
   },
-  "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  },
   "dependencies": {
-    "prop-types": "^15.8.1"
+    "@daitanjs/authentication": "file:../daitanjs/src/authentication",
+    "@daitanjs/data": "file:../daitanjs/src/data",
+    "@daitanjs/geo": "file:../daitanjs/src/geo",
+    "@daitanjs/intelligence": "file:../daitanjs/src/intelligence",
+    "dotenv": "^16.4.7",
+    "esbuild": "^0.24.2",
+    "glob": "^11.0.0",
+    "googleapis": "^144.0.0",
+    "prop-types": "^15.8.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
-  "workspaces": ["src/*"]
+  "workspaces": [
+    "src/*"
+  ]
 }

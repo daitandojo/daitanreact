@@ -1,0 +1,1226 @@
+# Repository: api
+# File: src/api/aigenerate/index.js
+// src/app/api/aigenerate/route.js
+
+import dotenv from "dotenv";
+dotenv.config();
+
+import { generateIntelligence } from "@daitanjs/intelligence";
+
+export async function POST(request) {
+  try {
+    console.log("POST request received at /api/aigenerate");
+
+    const { messages } = await request.json();
+
+    if (!Array.isArray(messages)) {
+      throw new Error('"messages" must be an array of messages.');
+    }
+
+    const responseObject = await generateIntelligence({ messages });
+
+    console.log("AI response:", JSON.stringify(responseObject, null, 2));
+
+    if (!responseObject || typeof responseObject !== "object") {
+      throw new Error("AI response is invalid or empty.");
+    }
+
+    if (!responseObject.type || !responseObject.question) {
+      throw new Error("AI response is missing required fields.");
+    }
+
+    if (!Array.isArray(responseObject.answers)) {
+      responseObject.answers = [];
+    }
+
+    return new Response(JSON.stringify(responseObject), {
+      headers: { "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error during AI generation:", error.message);
+    console.error("Stack trace:", error.stack);
+
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+}
+
+
+# File: src/api/allusers/index.js
+import { connect, User } from '@daitanjs/data';
+
+export async function GET() {
+  try {
+    // Connect to MongoDB
+    console.log('[GET /api/test] Connecting to MongoDB...');
+    await connect();
+    console.log('[GET /api/test] Successfully connected to MongoDB.');
+
+    // Fetch all users
+    const users = await User.find({})
+    console.log('[GET /api/test] Users fetched:', users);
+
+    // Return the list of users as JSON
+    return new Response(JSON.stringify(users), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error(`[GET /api/test] Error fetching users: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to fetch users' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+
+# File: src/api/auth/googleCallback/index.js
+import { google } from 'googleapis';
+
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+const oauth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+
+export async function GET(req) {
+  try {
+    console.log('[googleCallback.js] GET: Received request');
+
+    const code = new URL(req.url).searchParams.get('code');
+    if (!code) {
+      console.error('[googleCallback.js] GET: Authorization code missing');
+      return new Response(JSON.stringify({ error: 'Authorization code missing' }), { status: 400 });
+    }
+
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+
+    console.log('[googleCallback.js] GET: Successfully retrieved user info');
+    return new Response(JSON.stringify({ user: userInfo.data }), { status: 200 });
+  } catch (error) {
+    console.error(`[googleCallback.js] GET: Error - ${error.message}`, error);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  }
+}
+
+
+# File: src/api/auth/googleLogin/index.js
+import { auth } from '../../../lib/firebaseClient';
+
+const HTTP_STATUS = {
+  OK: 200,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  INTERNAL_SERVER_ERROR: 500,
+};
+
+export async function POST(req) {
+  console.info('[googleLogin.js] POST: Received request');
+
+  try {
+    const rawBody = await req.text();
+
+    if (!rawBody || typeof rawBody !== 'string') {
+      console.error('[googleLogin.js] POST: Empty or invalid request body');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Request body is empty or invalid' }),
+        { status: HTTP_STATUS.BAD_REQUEST, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let parsedBody;
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch (error) {
+      console.error('[googleLogin.js] POST: Invalid JSON format', error.message);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON format in request body' }),
+        { status: HTTP_STATUS.BAD_REQUEST, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { idToken } = parsedBody;
+
+    if (!idToken || typeof idToken !== 'string' || idToken.trim().length < 20) {
+      console.error('[googleLogin.js] POST: Missing or invalid ID token');
+      return new Response(
+        JSON.stringify({ success: false, error: 'ID token is missing or invalid' }),
+        { status: HTTP_STATUS.BAD_REQUEST, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.info('[googleLogin.js] POST: Verifying ID token');
+
+    try {
+      const decodedToken = await auth.verifyIdToken(idToken);
+      console.info('[googleLogin.js] POST: Token verified successfully');
+
+      return new Response(
+        JSON.stringify({ success: true, user: decodedToken }),
+        { status: HTTP_STATUS.OK, headers: { 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      console.error('[googleLogin.js] POST: Token verification failed', error.message);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or expired ID token' }),
+        { status: HTTP_STATUS.UNAUTHORIZED, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch (error) {
+    console.error('[googleLogin.js] POST: Unexpected Error', error.message, error);
+    return new Response(
+      JSON.stringify({ success: false, error: 'An unexpected error occurred' }),
+      { status: HTTP_STATUS.INTERNAL_SERVER_ERROR, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+
+# File: src/api/auth/login/index.js
+import { initializeFirebase, signIn } from '../../../lib/firebaseClient';
+
+export async function POST(req, res) {
+  console.info('[login.js] POST: Received request');
+
+  if (req.method !== 'POST') {
+    console.error('[login.js] POST: Method not allowed');
+    return res
+      .status(405)
+      .json({ success: false, error: 'Method not allowed' });
+  }
+
+  try {
+    const { email, password } = await req.json();
+
+    if (!email || !password) {
+      console.error('[login.js] POST: Missing email or password');
+      return res
+        .status(400)
+        .json({ success: false, error: 'Email and password are required' });
+    }
+
+    console.info('[login.js] POST: Authenticating user with Firebase');
+
+    // Initialize Firebase client
+    const { auth } = initializeFirebase();
+
+    // Authenticate using client-side Firebase Auth
+    const userCredential = await signIn(email, password);
+
+    // Retrieve ID token for the user
+    const token = await userCredential.getIdToken();
+
+    console.info('[login.js] POST: User authenticated successfully');
+    return res.status(200).json({
+      success: true,
+      token,
+      user: {
+        uid: userCredential.uid,
+        email: userCredential.email,
+      },
+    });
+  } catch (error) {
+    console.error(`[login.js] POST: Error during login - ${error.message}`);
+    return res
+      .status(500)
+      .json({ success: false, error: 'Authentication failed' });
+  }
+}
+
+
+# File: src/api/auth/logout/index.js
+import {
+  initializeFirebase,
+  signOut,
+} from '../../../lib/firebaseClient';
+
+export async function POST(req) {
+  console.info('[logout.js] POST: Received logout request');
+
+  try {
+    // Initialize Firebase client
+    const { auth } = initializeFirebase();
+
+    console.info('[logout.js] POST: Signing out the user');
+    await signOut(auth);
+
+    // Success response
+    return new Response(
+      JSON.stringify({ message: 'Successfully logged out' }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
+  } catch (error) {
+    console.error(
+      `[logout.js] POST: Unexpected error - ${error.message}`,
+      error,
+    );
+    return new Response(
+      JSON.stringify({ error: 'An unexpected error occurred' }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
+  }
+}
+
+
+# File: src/api/auth/user/index.js
+import { auth } from '@daitanjs/authentication';
+
+export async function GET(req) {
+  console.log('[user.js] GET: Received request to fetch user');
+
+  try {
+    // Extract Authorization Header
+    const authorizationHeader = req.headers.get('authorization');
+    if (!authorizationHeader || typeof authorizationHeader !== 'string') {
+      console.error('[user.js] GET: Missing or invalid authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Authorization header is missing or invalid' }),
+        { status: 401 }
+      );
+    }
+
+    console.log(
+      '[user.js] GET: Authorization header received:',
+      authorizationHeader
+    );
+
+    // Extract Bearer Token
+    const token = authorizationHeader.split('Bearer ')[1];
+    if (!token || typeof token !== 'string') {
+      console.error('[user.js] GET: Bearer token is missing or invalid');
+      return new Response(
+        JSON.stringify({ error: 'Bearer token is missing or invalid' }),
+        { status: 401 }
+      );
+    }
+
+    console.log('[user.js] GET: Verifying token:', token);
+
+    // Verify the token using Firebase Admin SDK
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(token);
+    } catch (verifyError) {
+      console.error(
+        '[user.js] GET: Token verification failed',
+        verifyError.message
+      );
+
+      const errorMessage =
+        verifyError.code === 'auth/argument-error'
+          ? 'Invalid or malformed token'
+          : 'Token verification failed';
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 401,
+      });
+    }
+
+    console.log('[user.js] GET: Token verified successfully:', decodedToken);
+
+    // Return the decoded user information
+    return new Response(JSON.stringify({ user: decodedToken }), {
+      status: 200,
+    });
+  } catch (error) {
+    console.error(
+      `[user.js] GET: Unexpected error - ${error.message}`,
+      error
+    );
+
+    // Detailed error response for debugging
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+    });
+  }
+}
+
+
+# File: src/api/geo/index.js
+import { forwardGeo, reverseGeo } from '@daitanjs/geo';
+
+export async function POST(req) {
+  try {
+    const { query, type } = await req.json();
+
+    if (type === 'forward') {
+      const locations = await forwardGeo({ location: query });
+      return new Response(JSON.stringify({ locations }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } else if (type === 'reverse') {
+      const address = await reverseGeo({ coordinates: query });
+      return new Response(JSON.stringify({ address }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Invalid request type' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+
+# File: src/api/mongodb/index.js
+import { connect } from '@daitanjs/data';
+
+export default async function handler(req, res) {
+  if (req.method === 'GET') {
+    try {
+      console.log('[GET /api/your-endpoint] Connecting to MongoDB...');
+      const { db } = await connect();
+      console.log('[GET /api/your-endpoint] Successfully connected to MongoDB.');
+      
+      console.log('[GET /api/your-endpoint] Fetching all users from the database...');
+      const data = await db.collection('users').find({}).toArray();
+      console.log(`[GET /api/your-endpoint] Successfully fetched ${data.length} users.`);
+      
+      res.status(200).json(data);
+    } catch (error) {
+      console.error(`[GET /api/your-endpoint] Error loading data: ${error.message}`);
+      res.status(500).json({ error: 'Failed to load data' });
+    }
+  } else {
+    console.warn(`[${req.method} /api/your-endpoint] Method not allowed.`);
+    res.status(405).json({ message: 'Only GET requests are allowed' });
+  }
+}
+
+
+# File: src/api/package.json
+{
+    "name": "@daitanreact/api",
+    "version": "1.0.0",
+    "main": "src/index.js",
+    "type": "module",
+    "exports": {
+        ".": {
+            "import": "./src/index.js"
+        }
+    },
+    "peerDependencies": {
+        "next": "^13.0.0"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "firebase": "^11.1.0",
+        "firebase-admin": "^13.0.2"
+    }
+}
+
+
+# File: src/api/users/[uid]/index.js
+import { connect } from '@daitanjs/data';
+import { 
+  getUserByUidController, 
+  updateUserController, 
+  deleteUserController 
+} from '../../../controllers/userController.js';
+
+export async function GET(req, { params }) {
+  const { uid } = params;
+
+  if (!uid) {
+    console.error('[GET /api/users] No user UID provided');
+    return new Response(JSON.stringify({ error: 'No UID provided' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+
+  try {
+    await connect();
+    const user = await getUserByUidController(uid);
+
+    if (!user) {
+      console.warn(`[GET /api/users/${uid}] User not found`);
+      return new Response(JSON.stringify({ error: 'User not found' }), { 
+        status: 404, 
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`[GET /api/users/${uid}] User found:`, user);
+    return new Response(JSON.stringify(user), { 
+      status: 200, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  } catch (error) {
+    console.error(`[GET /api/users/${uid}] Error fetching user: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to fetch user' }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+}
+
+export async function PUT(req, { params }) {
+  const { uid } = params;
+
+  if (!uid) {
+    console.error('[PUT /api/users] No UID provided');
+    return new Response(JSON.stringify({ error: 'No UID provided' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+
+  try {
+    await connect();
+    const body = await req.json();
+    const updatedUser = await updateUserController(uid, body);
+
+    if (!updatedUser) {
+      console.warn(`[PUT /api/users/${uid}] User not found`);
+      return new Response(JSON.stringify({ error: 'User not found' }), { 
+        status: 404, 
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`[PUT /api/users/${uid}] User updated successfully.`);
+    return new Response(JSON.stringify(updatedUser), { 
+      status: 200, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  } catch (error) {
+    console.error(`[PUT /api/users/${uid}] Error updating user: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to update user' }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+}
+
+export async function DELETE(req, { params }) {
+  const { uid } = params;
+
+  if (!uid) {
+    console.error('[DELETE /api/users] No UID provided');
+    return new Response(JSON.stringify({ error: 'No UID provided' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+
+  try {
+    console.log(`[DELETE /api/users/${uid}] Connecting to MongoDB...`);
+    await connect();
+    console.log(`[DELETE /api/users/${uid}] Successfully connected to MongoDB.`);
+    
+    console.log(`[DELETE /api/users/${uid}] Deleting user with Firebase UID: ${uid}`);
+    const deleteResult = await deleteUserController(uid);
+
+    if (deleteResult.error) {
+      console.warn(`[DELETE /api/users/${uid}] User not found`);
+      return new Response(JSON.stringify(deleteResult), { 
+        status: 404, 
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`[DELETE /api/users/${uid}] User deleted successfully.`);
+    return new Response(JSON.stringify({ message: 'User deleted' }), { 
+      status: 200, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  } catch (error) {
+    console.error(`[DELETE /api/users/${uid}] Error deleting user: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to delete user' }), { 
+      status: 500, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+}
+
+
+# File: src/api/users/index.js
+import { connect } from '@daitanjs/data';
+import { getUsersController, createUserController } from '../../controllers/userController';
+
+export async function GET() {
+  try {
+    console.log('[GET /api/users] Connecting to database...');
+    await connect();
+    console.log('[GET /api/users] Database connected successfully.');
+
+    const users = await getUsersController();  // Updated to use "Controller" function
+    console.log(`[GET /api/users] ${users.length} users fetched successfully.`);
+
+    return new Response(JSON.stringify(users), { status: 200 });
+  } catch (error) {
+    console.error(`[GET /api/users] Error fetching users: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to fetch users' }), { status: 500 });
+  }
+}
+
+export async function POST(req) {
+  try {
+    console.log('[POST /api/users] Connecting to database...');
+    await connect();
+    console.log('[POST /api/users] Database connected successfully.');
+
+    const body = await req.json();
+    console.log('[POST /api/users] Request body received:', body);
+
+    if (!body.uid || !body.email || !body.displayName) {
+      console.error('[POST /api/users] Missing required fields:', body);
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
+    }
+
+    const newUser = await createUserController(body);  // Updated to use "Controller" function
+    console.log('[POST /api/users] User created successfully:', newUser);
+    
+    return new Response(JSON.stringify(newUser), { status: 201 });
+  } catch (error) {
+    console.error(`[POST /api/users] Error creating user: ${error.message}`);
+    return new Response(JSON.stringify({ error: 'Failed to create user' }), { status: 500 });
+  }
+}
+
+
+
+
+# Repository: components
+# File: src/components/package.json
+{
+  "name": "@daitanreact/components",
+  "version": "1.0.0",
+  "main": "src/index.jsx",
+  "module": "src/index.jsx",
+  "types": "src/index.d.ts",
+  "type": "module",
+  "peerDependencies": {
+    "@mui/icons-material": "^6.3.0",
+    "@mui/material": "^6.3.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "dependencies": {
+    "prop-types": "^15.8.0"
+  },
+  "license": "MIT"
+}
+
+
+# File: src/components/src/BouncingIcons/index.js
+'use client';
+
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Box, styled } from '@mui/material';
+import {
+  Gavel,
+  Handyman,
+  Brush,
+  Translate,
+  School,
+  Build,
+  Carpenter,
+  MedicalServices,
+  Architecture,
+  Engineering,
+  Code,
+  BusinessCenter,
+  LocalLibrary,
+} from '@mui/icons-material';
+
+// Define a keyframe animation for continuous rotation in CSS
+const RotatingIcon = styled(Box)({
+  animation: 'spin 5s linear infinite',
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' },
+  },
+  transformOrigin: 'center center',
+  backfaceVisibility: 'hidden', // Prevent any flipping illusion
+});
+
+// List of icons to display
+const iconSet = [
+  Gavel,
+  Handyman,
+  Brush,
+  Translate,
+  School,
+  Build,
+  Carpenter,
+  MedicalServices,
+  Architecture,
+  Engineering,
+  Code,
+  BusinessCenter,
+  LocalLibrary,
+];
+
+export default function BouncingIcons() {
+  const containerRef = useRef(null);
+  const requestRef = useRef(null);
+  const iconsRef = useRef([]); // Array of refs for outer containers
+  const iconDataRef = useRef([]); // Array to store icon data
+  const [initialized, setInitialized] = useState(false); // State to trigger initial render
+
+  /**
+   * Initialize icon positions and velocities after the component mounts.
+   * Using useLayoutEffect ensures that measurements are accurate.
+   */
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+
+    // Generate initial states for 20 icons
+    const initialIcons = Array.from({ length: 20 }, () => {
+      const size = Math.random() * 40 + 30; // Size between 30px and 70px
+      return {
+        x: Math.random() * (width - size),
+        y: Math.random() * (height - size),
+        dx: (Math.random() - 0.5) * 3, // Horizontal speed between -1.5 and +1.5
+        dy: (Math.random() - 0.5) * 3, // Vertical speed between -1.5 and +1.5
+        size,
+        icon: iconSet[Math.floor(Math.random() * iconSet.length)],
+      };
+    });
+
+    iconDataRef.current = initialIcons;
+
+    // Initialize icon refs
+    iconsRef.current = initialIcons.map(() => React.createRef());
+
+    // Trigger initial render
+    setInitialized(true);
+  }, []);
+
+  /**
+   * Animation loop that updates the positions of the icons.
+   * Uses refs to manipulate styles directly for smoother animations.
+   */
+  useEffect(() => {
+    if (!initialized) return; // Ensure icons are initialized
+
+    const animate = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+
+      iconDataRef.current.forEach((icon, index) => {
+        let { x, y, dx, dy, size, icon: Icon } = icon;
+
+        x += dx;
+        y += dy;
+
+        // Bounce off the left and right walls
+        if (x < 0) {
+          x = 0;
+          dx = Math.abs(dx);
+        }
+        if (x + size > width) {
+          x = width - size;
+          dx = -Math.abs(dx);
+        }
+
+        // Bounce off the top and bottom walls
+        if (y < 0) {
+          y = 0;
+          dy = Math.abs(dy);
+        }
+        if (y + size > height) {
+          y = height - size;
+          dy = -Math.abs(dy);
+        }
+
+        // Update the icon data
+        iconDataRef.current[index] = { x, y, dx, dy, size, icon: Icon };
+
+        // Update the icon's position via ref
+        const iconRef = iconsRef.current[index];
+        if (iconRef.current) {
+          // Apply translation for movement; rotation is handled by CSS
+          iconRef.current.style.transform = `translate(${x}px, ${y}px)`;
+        }
+      });
+
+      requestRef.current = requestAnimationFrame(animate);
+    };
+
+    // Start the animation loop
+    requestRef.current = requestAnimationFrame(animate);
+
+    // Cleanup on unmount
+    return () => cancelAnimationFrame(requestRef.current);
+  }, [initialized]); // Runs once after icons are initialized
+
+  return (
+    <Box
+      ref={containerRef}
+      sx={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        zIndex: 0,
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+        pointerEvents: 'none', // Ensure no interaction
+        //background: 'radial-gradient(circle at center, #E3F2FD, #F7FAFC 80%)',
+      }}
+    >
+      {initialized &&
+        iconDataRef.current.map((iconState, index) => {
+          const { size, icon: Icon } = iconState;
+          return (
+            <Box
+              key={index}
+              ref={iconsRef.current[index]}
+              sx={{
+                position: 'absolute',
+                width: size,
+                height: size,
+                color: 'rgba(29,78,216,0.4)', // Subtle color
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: `translate(${iconState.x}px, ${iconState.y}px)`, // Initial position
+                // Remove any transition on transform to prevent janky movement
+              }}
+            >
+              <RotatingIcon
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon sx={{ fontSize: size }} />
+              </RotatingIcon>
+            </Box>
+          );
+        })}
+    </Box>
+  );
+}
+
+
+# File: src/components/src/Button/index.jsx
+import React from 'react';
+import PropTypes from 'prop-types';
+
+function Button({ children, onClick, style }) {
+  return (
+    <button type="button" onClick={onClick} style={style}>
+      {children}
+    </button>
+  );
+}
+
+Button.propTypes = {
+  children: PropTypes.node.isRequired,
+  onClick: PropTypes.func.isRequired,
+  style: PropTypes.object, // Optional
+};
+
+Button.defaultProps = {
+  style: {},
+};
+
+export default Button;
+
+
+# File: src/components/src/index.jsx
+export { default as Button } from './Button';
+export { default as BouncingIcons } from './BouncingIcons';
+
+
+
+
+# Repository: contexts
+# File: src/contexts/package.json
+{
+  "name": "@daitanreact/contexts",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "type": "module",
+  "peerDependencies": {
+      "react": "^18.3.1"
+  },
+  "license": "MIT"
+}
+
+
+# File: src/contexts/src/ThemeContext/index.js
+import React, { createContext, useContext, useState } from 'react';
+
+const ThemeContext = createContext();
+
+export const ThemeProvider = ({ children }) => {
+    const [theme, setTheme] = useState('light');
+
+    const toggleTheme = () => {
+        setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
+    };
+
+    return (
+        <ThemeContext.Provider value={{ theme, toggleTheme }}>
+            {children}
+        </ThemeContext.Provider>
+    );
+};
+
+export const useTheme = () => {
+    const context = useContext(ThemeContext);
+    if (!context) {
+        throw new Error('useTheme must be used within a ThemeProvider');
+    }
+    return context;
+};
+  
+
+# File: src/contexts/src/ThemeContext/styles.js
+const lightTheme = {
+  background: '#ffffff',
+  color: '#000000',
+};
+
+const darkTheme = {
+  background: '#000000',
+  color: '#ffffff',
+};
+
+export const themes = { light: lightTheme, dark: darkTheme };
+
+
+# File: src/contexts/src/index.js
+export { ThemeProvider, useTheme } from './ThemeContext';
+
+
+
+
+# Repository: controllers
+# File: src/controllers/userController.js
+import { User } from '@daitanjs/data';
+
+export async function getUsersController() {
+  try {
+    const users = await User.find();
+    console.info(`[getUsers] Status 200: Retrieved ${users.length} users`);
+    return users;
+  } catch (error) {
+    console.error(`[getUsers] Status 500: ${error.message}`);
+    throw new Error('Failed to fetch users');
+  }
+}
+
+export async function createUserController(data) {
+  try {
+    if (!data || !data.uid || !data.email) {
+      throw new Error('Missing required fields: uid, email');
+    }
+    const user = new User(data);
+    await user.save();
+    console.info(`[createUser] Status 201: User created with UID: ${user.uid}`);
+    return user;
+  } catch (error) {
+    console.error(`[createUser] Status 500: ${error.message}`);
+    throw new Error('Failed to create user');
+  }
+}
+
+export async function getUserByUidController(uid) {
+  try {
+    if (!uid) throw new Error('UID is required');
+    const user = await User.findOne({ uid });
+    if (!user) {
+      console.warn(`[getUserByUid] Status 404: User with UID ${uid} not found`);
+      throw new Error(`User with UID ${uid} not found`);
+    }
+    console.info(`[getUserByUid] Status 200: User found`);
+    return user;
+  } catch (error) {
+    console.error(`[getUserByUid] Status 500: ${error.message}`);
+    throw new Error('Failed to fetch user');
+  }
+}
+
+export async function updateUserController(uid, updatedProfile) {
+  try {
+    if (!uid) throw new Error('UID is required');
+    const user = await User.findOneAndUpdate(
+      { uid },
+      { $set: updatedProfile },
+      { new: true }
+    );
+    if (!user) {
+      console.warn(`[updateUser] Status 404: User with UID ${uid} not found`);
+      return { error: 'User not found' };
+    }
+    console.info(`[updateUser] Status 200: User updated successfully`);
+    return user;
+  } catch (error) {
+    console.error(`[updateUser] Status 500: ${error.message}`);
+    throw new Error('Failed to update user');
+  }
+}
+
+export async function deleteUserController(uid) {
+  try {
+    if (!uid) throw new Error('UID is required');
+    const user = await User.findOneAndDelete({ uid });
+    if (!user) {
+      console.warn(`[deleteUser] Status 404: User with UID ${uid} not found`);
+      return { error: 'User not found' };
+    }
+    console.info(`[deleteUser] Status 200: User deleted successfully`);
+    return { message: 'User deleted' };
+  } catch (error) {
+    console.error(`[deleteUser] Status 500: ${error.message}`);
+    throw new Error('Failed to delete user');
+  }
+}
+
+
+
+
+# Repository: hooks
+# File: src/hooks/package.json
+{
+  "name": "@daitanreact/hooks",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "type": "module",
+  "peerDependencies": {
+      "react": "^18.3.1"
+  },
+  "license": "MIT"
+}
+
+
+# File: src/hooks/src/index.js
+export { default as useToggle } from './useToggle';
+
+
+# File: src/hooks/src/useToggle/index.js
+import { useState } from 'react';
+
+const useToggle = (initialValue = false) => {
+    const [value, setValue] = useState(initialValue);
+
+    const toggle = () => {
+        setValue((prevValue) => !prevValue);
+    };
+
+    return [value, toggle];
+};
+
+export default useToggle;
+
+
+
+
+# Repository: lib
+# File: src/lib/firebaseClient.js
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+
+let firebaseApp = null;
+let authInstance = null;
+let firestoreInstance = null;
+let storageInstance = null;
+
+/**
+ * Initializes Firebase for the client-side app.
+ * @returns {object} The Firebase app, auth, firestore, and storage instances.
+ */
+export function initializeFirebase(config = null) {
+  if (!firebaseApp) {
+    const firebaseConfig = config || {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    };
+
+    firebaseApp = initializeApp(firebaseConfig);
+    console.log("✅ Firebase initialized on the client-side");
+  }
+
+  if (!authInstance) {
+    authInstance = getAuth(firebaseApp);
+    console.log("✅ Firebase Auth instance created");
+  }
+
+  if (!firestoreInstance) {
+    firestoreInstance = getFirestore(firebaseApp);
+    console.log("✅ Firestore instance created");
+  }
+
+  if (!storageInstance) {
+    storageInstance = getStorage(firebaseApp);
+    console.log("✅ Storage instance created");
+  }
+
+  return { app: firebaseApp, auth: authInstance, firestore: firestoreInstance, storage: storageInstance };
+}
+
+/**
+ * Firebase Authentication Methods
+ */
+export const signIn = async (email, password) => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(authInstance, email, password);
+    console.log("User signed in:", userCredential.user);
+    return userCredential.user;
+  } catch (error) {
+    console.error("Error signing in:", error.message);
+    throw error;
+  }
+};
+
+export const logout = async () => {
+  try {
+    await signOut(authInstance);
+    console.log("User signed out");
+  } catch (error) {
+    console.error("Error signing out:", error.message);
+    throw error;
+  }
+};
+
+export const observeAuthState = (callback) => {
+  return onAuthStateChanged(authInstance, callback);
+};
+
+/**
+ * Firestore Methods
+ */
+export const addDocument = async (collectionName, documentId, data) => {
+  try {
+    const docRef = doc(firestoreInstance, collectionName, documentId);
+    await setDoc(docRef, data);
+    console.log(`Document added to ${collectionName}/${documentId}`);
+    return true;
+  } catch (error) {
+    console.error("Error adding document:", error.message);
+    throw error;
+  }
+};
+
+export const getDocument = async (collectionName, documentId) => {
+  try {
+    const docRef = doc(firestoreInstance, collectionName, documentId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      console.log(`Document fetched: ${collectionName}/${documentId}`);
+      return docSnap.data();
+    } else {
+      console.warn(`No document found at ${collectionName}/${documentId}`);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching document:", error.message);
+    throw error;
+  }
+};
+
+export const updateDocument = async (collectionName, documentId, data) => {
+  try {
+    const docRef = doc(firestoreInstance, collectionName, documentId);
+    await updateDoc(docRef, data);
+    console.log(`Document updated at ${collectionName}/${documentId}`);
+    return true;
+  } catch (error) {
+    console.error("Error updating document:", error.message);
+    throw error;
+  }
+};
+
+export const deleteDocument = async (collectionName, documentId) => {
+  try {
+    const docRef = doc(firestoreInstance, collectionName, documentId);
+    await deleteDoc(docRef);
+    console.log(`Document deleted from ${collectionName}/${documentId}`);
+    return true;
+  } catch (error) {
+    console.error("Error deleting document:", error.message);
+    throw error;
+  }
+};
+
+/**
+ * Firebase Storage Methods
+ */
+export const uploadFile = async (path, file) => {
+  try {
+    const fileRef = ref(storageInstance, path);
+    await uploadBytes(fileRef, file);
+    console.log(`File uploaded to ${path}`);
+    return getDownloadURL(fileRef);
+  } catch (error) {
+    console.error("Error uploading file:", error.message);
+    throw error;
+  }
+};
+
+export const getFileURL = async (path) => {
+  try {
+    const fileRef = ref(storageInstance, path);
+    const url = await getDownloadURL(fileRef);
+    console.log(`File URL fetched: ${url}`);
+    return url;
+  } catch (error) {
+    console.error("Error fetching file URL:", error.message);
+    throw error;
+  }
+};
+
+export const deleteFile = async (path) => {
+  try {
+    const fileRef = ref(storageInstance, path);
+    await deleteObject(fileRef);
+    console.log(`File deleted from ${path}`);
+    return true;
+  } catch (error) {
+    console.error("Error deleting file:", error.message);
+    throw error;
+  }
+};
+
+
+
+
